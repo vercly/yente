@@ -44,7 +44,7 @@ class DatasetUpdater(object):
             return obj
         if not settings.DELTA_UPDATES:
             return obj
-        if obj.base_version is None or obj.target_version <= obj.base_version:
+        if obj.base_version is not None and obj.target_version <= obj.base_version:
             return obj
 
         index: DeltaIndex = await load_json_url(dataset.delta_url)
@@ -55,7 +55,7 @@ class DatasetUpdater(object):
         # We initially checked if the base_version was in the sorted_versions,
         # but the base_version can be a version that doesn't have a delta (no changes)
         # so we need to check if the base_version is older than the oldest delta version.
-        if obj.base_version < min(sorted_versions):
+        if obj.base_version is not None and obj.base_version < min(sorted_versions):
             log.warning(
                 "Loaded version of dataset is older than delta window",
                 dataset=dataset.name,
@@ -68,7 +68,7 @@ class DatasetUpdater(object):
 
         obj.delta_urls = []
         for version in sorted_versions:
-            if version <= obj.base_version or version > obj.target_version:
+            if obj.base_version is not None and version <= obj.base_version or version > obj.target_version:
                 continue
             obj.delta_urls.append((version, versions[version]))
 
@@ -78,7 +78,7 @@ class DatasetUpdater(object):
     @property
     def is_incremental(self) -> bool:
         """Check if there is sequence of delta entity patches that can be loaded."""
-        if self.force_full:
+        if self.force_full and not settings.USE_ONLY_DELTA_UPDATES:
             return False
         if not settings.DELTA_UPDATES:
             return False

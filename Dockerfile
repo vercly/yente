@@ -29,9 +29,9 @@ RUN pip install --no-cache-dir -e /app
 # ------------------------------------------------------------------------
 FROM ${python_image}
 
-LABEL org.opencontainers.image.title="OpenSanctions yente"
+LABEL org.opencontainers.image.title="OpenSanctions yente by Vercly"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.source="https://github.com/opensanctions/yente"
+LABEL org.opencontainers.image.source="https://github.com/vercly/yente"
 
 # Set environment variables
 ENV LANG="en_US.UTF-8"
@@ -43,17 +43,20 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN apt-get update && apt-get install -y \
     libicu72 \
     ca-certificates \
+    vim \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 
-RUN useradd -u 10000 -s /bin/false app
+RUN useradd -u 10000 -s /bin/bash app
+
 USER app
 
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv
-COPY --from=build /app /app
+COPY --from=build --chown=app /app /app
 # Install locale definition - test with `locale -a`
 COPY --from=build /usr/lib/locale/locale-archive /usr/lib/locale/locale-archive
 
-CMD ["uvicorn", "--workers", "1", "yente.asgi:app"]
+# CMD ["uvicorn", "--workers", "1", "yente.asgi:app"]
+CMD ["yente", "serve"]

@@ -1,37 +1,37 @@
 import asyncio
 import threading
 from typing import Any, AsyncGenerator, Dict, List
+
 from followthemoney import model
 from followthemoney.exc import FollowTheMoneyException
 from followthemoney.types.date import DateType
 
 from yente import settings
+from yente.data import get_catalog, refresh_catalog
+from yente.data.dataset import Dataset
+from yente.data.entity import Entity
 from yente.data.manifest import Catalog
+from yente.data.updater import DatasetUpdater
+from yente.data.util import expand_dates, phonetic_names
+from yente.data.util import index_name_parts, index_name_keys
 from yente.exc import YenteIndexError
 from yente.logs import get_logger
-from yente.data.entity import Entity
-from yente.data.dataset import Dataset
-from yente.data import get_catalog
-from yente.data.updater import DatasetUpdater
+from yente.provider import SearchProvider, with_provider
 from yente.search.mapping import (
     NAME_PART_FIELD,
     NAME_KEY_FIELD,
     NAMES_FIELD,
     NAME_PHONETIC_FIELD,
 )
-from yente.provider import SearchProvider, with_provider
-from yente.search.versions import parse_index_name
 from yente.search.versions import construct_index_name
-from yente.data.util import expand_dates, phonetic_names
-from yente.data.util import index_name_parts, index_name_keys
-
+from yente.search.versions import parse_index_name
 
 log = get_logger(__name__)
 lock = threading.Lock()
 
 
 async def iter_entity_docs(
-    updater: DatasetUpdater, index: str
+        updater: DatasetUpdater, index: str
 ) -> AsyncGenerator[Dict[str, Any], None]:
     dataset = updater.dataset
     datasets = set(dataset.dataset_names)
@@ -102,7 +102,7 @@ async def get_index_version(provider: SearchProvider, dataset: Dataset) -> str |
 
 
 async def index_entities(
-    provider: SearchProvider, dataset: Dataset, force: bool
+        provider: SearchProvider, dataset: Dataset, force: bool
 ) -> None:
     """Index entities in a particular dataset, with versioning of the index."""
     alias = settings.ENTITY_INDEX
@@ -119,7 +119,7 @@ async def index_entities(
         version=updater.target_version,
         base_version=updater.base_version,
         incremental=updater.is_incremental,
-        # delta_urls=updater.delta_urls,
+        delta_urls=updater.delta_urls,
         force=force,
     )
     next_index = construct_index_name(dataset.name, updater.target_version)
@@ -130,7 +130,10 @@ async def index_entities(
     # await es.indices.delete(index=next_index)
     if updater.is_incremental and not force:
         base_index = construct_index_name(dataset.name, updater.base_version)
-        await provider.clone_index(base_index, next_index)
+        try:
+            await provider.clone_index(base_index, next_index)
+        except:
+            await provider.create_index(next_index)
     else:
         await provider.create_index(next_index)
 
@@ -164,6 +167,7 @@ async def index_entities(
         prefix=dataset_prefix,
     )
     log.info("Index is now aliased to: %s" % alias, index=next_index)
+    await refresh_catalog()
 
 
 async def delete_old_indices(provider: SearchProvider, catalog: Catalog) -> None:

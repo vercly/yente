@@ -4,7 +4,7 @@ all:
 	make api
 
 build:
-	docker build -t ghcr.io/opensanctions/yente:latest .
+	docker build -t docker.vercly.it/yente:4.2.1 .
 
 shell: build
 	docker compose run --rm app bash

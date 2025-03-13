@@ -137,6 +137,7 @@ HTTP_PROXY = env_str("YENTE_HTTP_PROXY", "")
 
 # Whether to enable delta updates for the data:
 DELTA_UPDATES = as_bool(env_str("YENTE_DELTA_UPDATES", "true"))
+USE_ONLY_DELTA_UPDATES = as_bool(env_str( "YENTE_USE_ONLY_DELTA_UPDATES", "false"))
 
 RESOURCES_PATH = Path(__file__).parent.joinpath("resources")
 
