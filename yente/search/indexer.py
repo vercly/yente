@@ -108,10 +108,6 @@ async def index_entities(
     alias = settings.ENTITY_INDEX
     base_version = await get_index_version(provider, dataset)
     updater = await DatasetUpdater.build(dataset, base_version, force_full=force)
-    if not updater.needs_update():
-        if updater.dataset.load:
-            log.info("No update needed", dataset=dataset.name, version=base_version)
-        return
     log.info(
         "Indexing entities",
         dataset=dataset.name,
@@ -122,6 +118,10 @@ async def index_entities(
         delta_urls=updater.delta_urls,
         force=force,
     )
+    if not updater.needs_update():
+        if updater.dataset.load:
+            log.info("No update needed", dataset=dataset.name, version=base_version)
+        return
     next_index = construct_index_name(dataset.name, updater.target_version)
     if not force and await provider.exists_index_alias(alias, next_index):
         log.info("Index is up to date.", index=next_index)

@@ -41,6 +41,7 @@ class Dataset(NKDataset):
                     ts = datetime_iso(mdt)
             self.version = iso_to_version(ts) or "static"
 
+        self.use_delta_only = data.get("use_delta_only", False)
         self.delta_url = data.get("delta_url", None)
 
         namespace = as_bool(data.get("namespace"), False)

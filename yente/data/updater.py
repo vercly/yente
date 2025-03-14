@@ -29,6 +29,7 @@ class DatasetUpdater(object):
         self.target_version = dataset.version or "static"
         self.base_version = base_version
         self.force_full = force_full
+        self.delta_only = dataset.use_delta_only
         self.delta_urls: Optional[List[Tuple[str, str]]] = None
 
     @classmethod
@@ -37,15 +38,16 @@ class DatasetUpdater(object):
     ) -> "DatasetUpdater":
         """Fetch the index of delta files and decide an index building strategy."""
         obj = DatasetUpdater(dataset, base_version, force_full=force_full)
-        if force_full:
-            return obj
-        if dataset.delta_url is None:
-            log.debug("No delta updates available for: %r" % dataset.name)
-            return obj
-        if not settings.DELTA_UPDATES:
-            return obj
-        if obj.base_version is not None and obj.target_version <= obj.base_version:
-            return obj
+        if not obj.delta_only:
+            if force_full:
+                return obj
+            if dataset.delta_url is None:
+                log.debug("No delta updates available for: %r" % dataset.name)
+                return obj
+            if not settings.DELTA_UPDATES:
+                return obj
+            if obj.base_version is not None and obj.target_version <= obj.base_version:
+                return obj
 
         index: DeltaIndex = await load_json_url(dataset.delta_url)
         versions = index.get("versions", {})
@@ -55,21 +57,23 @@ class DatasetUpdater(object):
         # We initially checked if the base_version was in the sorted_versions,
         # but the base_version can be a version that doesn't have a delta (no changes)
         # so we need to check if the base_version is older than the oldest delta version.
-        if obj.base_version is not None and obj.base_version < min(sorted_versions):
-            log.warning(
-                "Loaded version of dataset is older than delta window",
-                dataset=dataset.name,
-                delta_url=dataset.delta_url,
-                base_version=obj.base_version,
-                target_version=obj.target_version,
-                delta_versions=sorted_versions,
-            )
-            return obj
+        if obj.base_version is not None:
+            if obj.base_version < min(sorted_versions):
+                log.warning(
+                    "Loaded version of dataset is older than delta window",
+                    dataset=dataset.name,
+                    delta_url=dataset.delta_url,
+                    base_version=obj.base_version,
+                    target_version=obj.target_version,
+                    delta_versions=sorted_versions,
+                )
+                return obj
 
         obj.delta_urls = []
         for version in sorted_versions:
-            if obj.base_version is not None and version <= obj.base_version or version > obj.target_version:
-                continue
+            if obj.base_version is not None:
+                if version <= obj.base_version or version > obj.target_version:
+                    continue
             obj.delta_urls.append((version, versions[version]))
 
         obj.target_version = max(sorted_versions)
@@ -78,7 +82,7 @@ class DatasetUpdater(object):
     @property
     def is_incremental(self) -> bool:
         """Check if there is sequence of delta entity patches that can be loaded."""
-        if self.force_full and not settings.USE_ONLY_DELTA_UPDATES:
+        if self.force_full:
             return False
         if not settings.DELTA_UPDATES:
             return False
